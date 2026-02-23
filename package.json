@@ -9,15 +9,19 @@
     "start": "NODE_ENV=production bun src/index.ts"
   },
   "dependencies": {
+    "@babylonjs/core": "^8.52.0",
+    "babylon-ifc-loader": "^1.0.2",
     "clsx": "^2.1.1",
     "open-props": "^1.7.23",
     "react": "^19",
     "react-dom": "^19"
   },
   "devDependencies": {
+    "@babylonjs/inspector": "^8.52.0",
     "@types/bun": "latest",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "bun-lightningcss": "^0.2.0"
+    "bun-lightningcss": "^0.2.0",
+    "web-ifc": "^0.0.75"
   }
 }
