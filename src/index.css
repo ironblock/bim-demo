@@ -1,0 +1,5 @@
+@layer reset, defaults, patterns, components, utilities, overrides;
+
+@import "../node_modules/open-props/open-props.min.css";
+@import "../node_modules/open-props/normalize.min.css" layer(reset);
+@import "../node_modules/open-props/buttons.min.css" layer(defaults);
