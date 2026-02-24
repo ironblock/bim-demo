@@ -1,4 +1,5 @@
 import { adjustCameraToMeshes } from "@/babylon/camera";
+import { buildIfcModel, disposeIfcModel, type BuildProgress } from "@/babylon/ifc";
 import WebIFC from "@/utility/WebIFC";
 import {
   type AbstractMesh,
@@ -6,9 +7,7 @@ import {
   type TransformNode,
 } from "@babylonjs/core";
 import {
-  buildIfcModel,
   closeIfcModel,
-  disposeIfcModel,
   getProjectInfo,
   loadIfcModel,
   type ProjectInfoResult,
@@ -24,6 +23,7 @@ interface IdleState extends IfcFileStatus {
 }
 interface LoadingState extends IfcFileStatus {
   status: "loading";
+  progress: BuildProgress | null;
 }
 interface ReadyState extends IfcFileStatus {
   status: "ready";
@@ -65,7 +65,7 @@ class IfcModelStore {
       closeIfcModel(await WebIFC, modelID);
     }
 
-    this.setState({ status: "loading" });
+    this.setState({ status: "loading", progress: null });
 
     const api = await WebIFC;
 
@@ -73,13 +73,20 @@ class IfcModelStore {
       coordinateToOrigin: true,
     });
 
-    const { meshes, rootNode } = buildIfcModel(raw, scene, {
+    const gen = buildIfcModel(raw, scene, {
       autoCenter: true,
       mergeMeshes: true,
       doubleSided: true,
       generateNormals: false,
       freezeAfterBuild: true,
     });
+
+    let next = await gen.next();
+    while (!next.done) {
+      this.setState({ status: "loading", progress: next.value });
+      next = await gen.next();
+    }
+    const { meshes, rootNode } = next.value;
 
     const projectInfo = getProjectInfo(api, raw.modelID);
 

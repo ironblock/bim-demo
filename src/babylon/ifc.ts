@@ -33,6 +33,14 @@ export interface SceneBuildOptions {
   generateNormals?: boolean; // default: false
   verbose?: boolean; // default: true
   freezeAfterBuild?: boolean; // default: true
+  chunkSize?: number; // parts processed per event-loop yield, default: 100
+}
+
+/** Progress snapshot yielded during buildIfcModel */
+export interface BuildProgress {
+  phase: "creating" | "merging" | "finalizing";
+  done: number;
+  total: number;
 }
 
 /** Result of building a scene */
@@ -72,23 +80,31 @@ interface MeshWithColor {
 // PUBLIC API - Scene Building
 // ============================================================================
 
+const yieldToEventLoop = () =>
+  new Promise<void>((resolve) => setTimeout(resolve, 0));
+
 /**
- * Build a Babylon.js scene from raw IFC model data
+ * Build a Babylon.js scene from raw IFC model data.
+ *
+ * Returns an async generator that yields BuildProgress after each chunk,
+ * allowing the caller to keep the UI responsive between chunks. The final
+ * IteratorResult carries the SceneBuildResult as its value.
  */
-export function buildIfcModel(
+export async function* buildIfcModel(
   model: RawIfcModel,
   scene: Scene,
   options: SceneBuildOptions = {},
-): SceneBuildResult {
+): AsyncGenerator<BuildProgress, SceneBuildResult, void> {
   const startTime = performance.now();
 
-  const opts: SceneBuildOptions = {
+  const opts = {
     mergeMeshes: true,
     autoCenter: true,
     doubleSided: true,
     generateNormals: false,
     verbose: true,
     freezeAfterBuild: true,
+    chunkSize: 100,
     ...options,
   };
 
@@ -101,16 +117,30 @@ export function buildIfcModel(
   // Create root transform node (without scaling yet)
   const rootNode = new TransformNode("ifc-root", scene);
 
-  // Create meshes from raw parts
-  const meshesWithColor: MeshWithColor[] = model.parts.map((part) => {
-    return createMeshFromPart(part, model.modelID, scene, rootNode, opts);
-  });
+  // ── Phase 1: Create meshes in chunks ────────────────────────────────────────
+  const meshesWithColor: MeshWithColor[] = [];
+  const total = model.parts.length;
+
+  for (let i = 0; i < total; i += opts.chunkSize) {
+    const chunk = model.parts.slice(i, i + opts.chunkSize);
+    for (const part of chunk) {
+      meshesWithColor.push(
+        createMeshFromPart(part, model.modelID, scene, rootNode, opts),
+      );
+    }
+    yield {
+      phase: "creating",
+      done: Math.min(i + opts.chunkSize, total),
+      total,
+    };
+    await yieldToEventLoop();
+  }
 
   if (opts.verbose) {
     console.log(`  Created ${meshesWithColor.length} initial meshes`);
   }
 
-  // Group by (expressID + colorId)
+  // Group by (expressID + colorId) — cheap single pass, no yield needed
   const meshGroups = groupMeshesByKey(meshesWithColor);
 
   if (opts.verbose) {
@@ -119,22 +149,26 @@ export function buildIfcModel(
     );
   }
 
-  // Create materials and merge groups
+  // ── Phase 2: Material creation and mesh merging, one group per yield ────────
   const materialCache = new Map<number, StandardMaterial>();
   const finalMeshes: AbstractMesh[] = [];
   let mergedCount = 0;
   let skippedCount = 0;
   let materialZOffset = 0;
+  let groupsDone = 0;
+  const groupsTotal = meshGroups.size;
 
-  meshGroups.forEach((group) => {
+  for (const group of meshGroups.values()) {
     const meshes = group.map((item) => item.mesh);
-    if (!group[0] || !meshes[0]) return;
+    if (!group[0] || !meshes[0]) {
+      groupsDone++;
+      continue;
+    }
 
     const expressID = meshes[0].metadata!.expressID;
     const colorId = group[0].colorId;
     const color = group[0].color;
 
-    // Get or create material
     const material = getMaterial(
       colorId,
       color,
@@ -143,43 +177,35 @@ export function buildIfcModel(
       materialZOffset,
       opts,
     );
-    // Increment z-offset with modulo to prevent infinite growth
     materialZOffset = (materialZOffset + 0.05) % 1.0;
 
     if (meshes.length === 1) {
-      // Single mesh - no merging needed
       const mesh = meshes[0];
       mesh.name = `ifc-${expressID}`;
       mesh.material = material;
       finalMeshes.push(mesh);
     } else if (opts.mergeMeshes) {
-      // Multiple meshes - check if we can merge
       const canMerge = canMergeMeshes(meshes, model.storeyMap);
 
       if (canMerge) {
-        // Safe to merge
         const mergedMesh = Mesh.MergeMeshes(
           meshes,
           true, // disposeSource
           true, // allow32BitsIndices
-          undefined, // meshSubclass
-          false, // subdivideWithSubMeshes
-          false, // multiMultiMaterials
+          undefined,
+          false,
+          false,
         );
 
         if (mergedMesh) {
           mergedMesh.name = `ifc-${expressID}`;
           mergedMesh.parent = rootNode;
           mergedMesh.material = material;
-          mergedMesh.metadata = {
-            expressID: expressID,
-            modelID: model.modelID,
-          };
+          mergedMesh.metadata = { expressID, modelID: model.modelID };
           mergedMesh.isVisible = true;
           finalMeshes.push(mergedMesh);
           mergedCount++;
         } else {
-          // Merge failed - keep original meshes
           meshes.forEach((mesh) => {
             mesh.name = `ifc-${expressID}`;
             mesh.material = material;
@@ -188,7 +214,6 @@ export function buildIfcModel(
           skippedCount++;
         }
       } else {
-        // Cannot merge - different storeys
         meshes.forEach((mesh) => {
           mesh.name = `ifc-${expressID}`;
           mesh.material = material;
@@ -202,23 +227,25 @@ export function buildIfcModel(
         }
       }
     } else {
-      // Merging disabled - keep all meshes
       meshes.forEach((mesh) => {
         mesh.name = `ifc-${expressID}`;
         mesh.material = material;
         finalMeshes.push(mesh);
       });
     }
-  });
+
+    groupsDone++;
+    yield { phase: "merging", done: groupsDone, total: groupsTotal };
+    await yieldToEventLoop();
+  }
+
+  // ── Phase 3: Finalize ────────────────────────────────────────────────────────
+  yield { phase: "finalizing", done: 0, total: 1 };
 
   // Apply Z-axis flip for coordinate system conversion (IFC to Babylon)
-  // This must be done AFTER all meshes are created and transforms are baked
   rootNode.scaling.z = -1;
-
-  // Force update of world matrix to apply scaling
   rootNode.computeWorldMatrix(true);
 
-  // Auto-center the model if requested
   if (opts.autoCenter) {
     const bounds = getModelBounds(finalMeshes);
     if (bounds) {
@@ -254,29 +281,16 @@ export function buildIfcModel(
   }
 
   if (opts.freezeAfterBuild) {
-    // Freeze only IFC meshes that are children of ifc-root
-    const rootNode = scene.getTransformNodeByName("ifc-root");
-    if (rootNode) {
-      rootNode.getChildMeshes().forEach((mesh) => {
-        mesh.freezeWorldMatrix();
-      });
-    }
-    // Freeze IFC materials only
+    rootNode.getChildMeshes().forEach((mesh) => mesh.freezeWorldMatrix());
     scene.materials.forEach((material) => {
-      if (material.name.startsWith("ifc-material-")) {
-        material.freeze();
-      }
+      if (material.name.startsWith("ifc-material-")) material.freeze();
     });
     if (opts.verbose) {
       console.log(`  IFC meshes and materials frozen for optimal performance`);
     }
   }
 
-  return {
-    meshes: finalMeshes,
-    rootNode,
-    stats,
-  };
+  return { meshes: finalMeshes, rootNode, stats };
 }
 
 /**
