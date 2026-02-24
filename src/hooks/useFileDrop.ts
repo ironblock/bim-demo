@@ -8,6 +8,7 @@ export type FileDropState = {
 export function useFileDrop(
   extension: string,
   target: RefObject<HTMLElement | null>,
+  onFilesDropped?: (files: FileList) => void,
 ): FileDropState {
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<FileList | null>(null);
@@ -41,6 +42,7 @@ export function useFileDrop(
             }
 
             console.info("Files dropped:", event.dataTransfer.files);
+            onFilesDropped?.(event.dataTransfer.files);
             setFiles(event.dataTransfer.files);
           }
           return;

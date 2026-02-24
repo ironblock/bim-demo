@@ -105,13 +105,14 @@ export function useIfcData(instance: RefObject<BabylonInstance | null>) {
     store.current.getSnapshot,
   );
 
-  const loadModel = (source: string | File) => {
-    const babylon = instance.current;
-    if (!babylon) return;
-    store.current.load(source, babylon).catch((error) => {
+  const loadIfcFiles = (source: FileList) => {
+    if (!instance.current || !source[0]) return;
+
+    // TODO: Handle multiple files
+    store.current.load(source[0], instance.current).catch((error) => {
       console.error("Failed to load IFC model:", error);
     });
   };
 
-  return { ifcState, loadModel };
+  return { ifcState, loadIfcFiles };
 }
