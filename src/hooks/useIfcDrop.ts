@@ -1,57 +1,61 @@
 import { useEffect, useState, type RefObject } from "react";
 
+export type IfcDropState = {
+  isDragging: boolean;
+  files: FileList | null;
+};
+
 export function useIfcDrop(
   canvas: RefObject<HTMLCanvasElement | null>,
-  loadModel: (source: File) => Promise<void>,
-): boolean {
+): IfcDropState {
   const [isDragging, setIsDragging] = useState(false);
+  const [files, setFiles] = useState<FileList | null>(null);
 
   useEffect(() => {
-    const el = canvas.current;
-    if (!el) return;
+    if (!canvas.current) return;
 
-    const onDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(true);
-    };
+    const handleDragEvent = (event: DragEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
 
-    const onDragLeave = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-    };
+      switch (event.type) {
+        case "dragenter":
+          setIsDragging(true);
+          return;
 
-    const onDrop = async (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
+        case "dragleave":
+          setIsDragging(false);
+          return;
 
-      const file = e.dataTransfer?.files[0];
-      if (!file) return;
+        case "drop":
+          setIsDragging(false);
+          if (event.dataTransfer?.files.length) {
+            for (const file of event.dataTransfer.files) {
+              if (!file.name.toLowerCase().endsWith(".ifc")) {
+                console.error("All files must be in IFC format");
+                return;
+              }
+            }
 
-      if (!file.name.toLowerCase().endsWith(".ifc")) {
-        console.error("Please drop an IFC file (.ifc extension)");
-        return;
-      }
-
-      try {
-        await loadModel(file);
-      } catch (error) {
-        console.error("Failed to load dropped IFC file:", error);
+            console.info("Files dropped:", event.dataTransfer.files);
+            setFiles(event.dataTransfer.files);
+          }
+          return;
       }
     };
 
-    el.addEventListener("dragover", onDragOver);
-    el.addEventListener("dragleave", onDragLeave);
-    el.addEventListener("drop", onDrop);
+    canvas.current.addEventListener("dragover", handleDragEvent);
+    canvas.current.addEventListener("dragleave", handleDragEvent);
+    canvas.current.addEventListener("drop", handleDragEvent);
 
     return () => {
-      el.removeEventListener("dragover", onDragOver);
-      el.removeEventListener("dragleave", onDragLeave);
-      el.removeEventListener("drop", onDrop);
-    };
-  }, [canvas, loadModel]);
+      if (!canvas.current) return;
 
-  return isDragging;
+      canvas.current.removeEventListener("dragover", handleDragEvent);
+      canvas.current.removeEventListener("dragleave", handleDragEvent);
+      canvas.current.removeEventListener("drop", handleDragEvent);
+    };
+  }, [canvas]);
+
+  return { isDragging, files };
 }

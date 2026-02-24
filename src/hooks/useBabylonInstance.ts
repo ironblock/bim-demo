@@ -19,11 +19,12 @@ export type BabylonInstance = {
 export function useBabylonInstance(
   canvas: RefObject<HTMLCanvasElement | null>,
 ): RefObject<BabylonInstance | null> {
-  const render: RefObject<BabylonInstance | null> = useRef(null);
+  const render = useRef<BabylonInstance>(null);
 
   useLayoutEffect(() => {
-    if (!canvas.current) return;
+    if (!canvas.current || render.current) return;
 
+    console.info("Initializing Babylon scene");
     const engine = new Engine(canvas.current, true);
     const scene = new Scene(engine);
 
@@ -50,9 +51,11 @@ export function useBabylonInstance(
     render.current = { engine, scene, camera, light };
 
     return () => {
+      console.info("Cleaning up Babylon scene");
+      render.current = null;
       engine.dispose();
     };
-  });
+  }, []);
 
   return render;
 }

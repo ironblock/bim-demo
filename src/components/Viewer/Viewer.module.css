@@ -4,27 +4,34 @@
   height: 100%;
 }
 
-.canvas {
+.babylonScene {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.canvasDragging {
-  opacity: 0.5;
-  outline: 2px dashed #00aaff;
-}
-
 .overlay {
   position: absolute;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
+  width: 100%;
+  height: 100%;
+  margin: 10%;
+
+  opacity: 0;
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
   padding: 0.4rem 0.8rem;
   border-radius: 4px;
   font-size: 0.875rem;
+
+  transition: all 0.25s ease-in-out;
+
   pointer-events: none;
   white-space: nowrap;
+}
+
+.isDragging {
+  .overlay {
+    opacity: 1;
+    outline: 2px dashed #00aaff;
+  }
 }

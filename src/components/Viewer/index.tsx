@@ -7,32 +7,26 @@ import { useBabylonInspector } from "../../hooks/useBabylonInspector";
 import { useIfcModel } from "../../hooks/useIfcModel";
 import { useIfcPicking } from "../../hooks/useIfcPicking";
 import { useIfcDrop } from "../../hooks/useIfcDrop";
+import clsx from "clsx";
 import InfoOverlay from "./InfoOverlay";
 import styles from "./Viewer.module.css";
 
 export default function Viewer() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const instance = useBabylonInstance(canvas);
+  const { isDragging, files } = useIfcDrop(canvas);
+  const { modelState, loadModel } = useIfcModel(instance);
+  const pickedElement = useIfcPicking(instance);
+
   useEngineResize(instance);
   useBabylonInspector(instance);
 
-  const { modelState, loadModel } = useIfcModel(instance);
-  const pickedElement = useIfcPicking(instance);
-  const isDragging = useIfcDrop(canvas, loadModel);
-
-  useEffect(() => {
-    loadModel("/test.ifc").catch((error) => {
-      console.error("Failed to load initial IFC file:", error);
-    });
-  }, [loadModel]);
-
   return (
-    <div className={styles.container}>
-      <canvas
-        ref={canvas}
-        className={`${styles.canvas}${isDragging ? ` ${styles.canvasDragging}` : ""}`}
-      />
+    <section
+      className={clsx(styles.container, isDragging && styles.isDragging)}
+    >
+      <canvas ref={canvas} className={styles.babylonScene} />
       <InfoOverlay pickedElement={pickedElement} modelState={modelState} />
-    </div>
+    </section>
   );
 }
