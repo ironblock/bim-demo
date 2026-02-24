@@ -1,5 +1,25 @@
+.container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .canvas {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.overlay {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  pointer-events: none;
+  white-space: nowrap;
 }

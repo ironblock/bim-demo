@@ -1,4 +1,5 @@
 import { initializeWebIFC } from "babylon-ifc-loader";
+import type { IfcAPI } from "web-ifc";
 
 /**
  * The web-ifc.wasm file isn't exported by the web-ifc package, so several intermediate
@@ -8,7 +9,7 @@ import { initializeWebIFC } from "babylon-ifc-loader";
  * - Bun's file loader will resolve the path and place the file appropriately
  * - `await import()` is used to retrieve the actual path from Bun's manifest
  */
-export const wasmPath = (await import("web-ifc/wasm")).default;
-export const WebIFC = initializeWebIFC(wasmPath);
+export const wasmPath: string = (await import("web-ifc/wasm")).default;
+export const WebIFC: Promise<IfcAPI> = initializeWebIFC(wasmPath);
 
 export default WebIFC;
