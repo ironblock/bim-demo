@@ -24,6 +24,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "web-ifc/wasm": ["./node_modules/web-ifc/web-ifc.wasm"],
     },
 
     // Some stricter flags (disabled by default)

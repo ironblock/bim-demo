@@ -10,7 +10,6 @@ import {
   Vector3,
 } from "@babylonjs/core";
 import {
-  initializeWebIFC,
   loadIfcModel,
   closeIfcModel,
   getProjectInfo,
@@ -30,8 +29,6 @@ export type RenderContext = {
   light: Light;
   resizeHandler: () => void;
 };
-
-const IFC = initializeWebIFC();
 
 export function babylonSetup(canvas: HTMLCanvasElement): RenderContext {
   const engine = new Engine(canvas, true);
@@ -81,9 +78,6 @@ export default function Viewer() {
       render.current = babylonSetup(canvas.current);
     }
 
-    IFC.then((e) => {
-      console.log(e);
-    });
     return () => {
       if (render.current) {
         babylonCleanup(render.current);
