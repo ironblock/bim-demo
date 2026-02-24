@@ -1,13 +1,7 @@
-import {
-  ArcRotateCamera,
-  Camera,
-  Engine,
-  HemisphericLight,
-  Light,
-  Scene,
-  Vector3,
-} from "@babylonjs/core";
-import { useRef, useLayoutEffect, type RefObject } from "react";
+import { createDefaultCamera } from "@/babylon/camera";
+import { createDefaultLight } from "@/babylon/lighting";
+import { Camera, Engine, Light, Scene } from "@babylonjs/core";
+import { useLayoutEffect, useRef, type RefObject } from "react";
 
 export type BabylonInstance = {
   engine: Engine;
@@ -15,6 +9,8 @@ export type BabylonInstance = {
   camera: Camera;
   light: Light;
 };
+
+let initialized = false;
 
 export function useBabylonInstance(
   canvas: RefObject<HTMLCanvasElement | null>,
@@ -28,21 +24,8 @@ export function useBabylonInstance(
     const engine = new Engine(canvas.current, true);
     const scene = new Scene(engine);
 
-    const camera = new ArcRotateCamera(
-      "camera",
-      -Math.PI / 2,
-      Math.PI / 2.5,
-      10,
-      Vector3.Zero(),
-      scene,
-    );
-    camera.attachControl(canvas.current, true);
-    camera.lowerRadiusLimit = 1;
-    camera.upperRadiusLimit = 1000;
-    camera.wheelPrecision = 10;
-
-    const light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
-    light.intensity = 0.7;
+    const camera = createDefaultCamera(scene);
+    const light = createDefaultLight(scene);
 
     engine.runRenderLoop(() => {
       scene.render();

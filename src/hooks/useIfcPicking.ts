@@ -1,8 +1,7 @@
-import { type IfcAPI } from "web-ifc";
-import { type AbstractMesh, Color3 } from "@babylonjs/core";
-import { useEffect, useState, useRef, type RefObject } from "react";
-import { type BabylonInstance } from "./useBabylonInstance";
 import WebIFC from "@/utility/WebIFC";
+import { Color3, type AbstractMesh } from "@babylonjs/core";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { type BabylonInstance } from "./useBabylonInstance";
 
 export type PickedElementInfo = {
   typeName: string;

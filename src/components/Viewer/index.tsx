@@ -1,22 +1,22 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useFileDrop } from "@/hooks/useFileDrop";
+import clsx from "clsx";
+import { useRef } from "react";
+import { useBabylonInspector } from "../../hooks/useBabylonInspector";
 import { useBabylonInstance } from "../../hooks/useBabylonInstance";
 import { useEngineResize } from "../../hooks/useEngineResize";
-import { useBabylonInspector } from "../../hooks/useBabylonInspector";
-import { useIfcModel } from "../../hooks/useIfcModel";
+import { useIfcData } from "../../hooks/useIfcData";
 import { useIfcPicking } from "../../hooks/useIfcPicking";
-import { useIfcDrop } from "../../hooks/useIfcDrop";
-import clsx from "clsx";
 import InfoOverlay from "./InfoOverlay";
 import styles from "./Viewer.module.css";
 
 export default function Viewer() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const instance = useBabylonInstance(canvas);
-  const { isDragging, files } = useIfcDrop(canvas);
-  const { modelState, loadModel } = useIfcModel(instance);
+  const { ifcState: modelState, loadModel } = useIfcData(instance);
   const pickedElement = useIfcPicking(instance);
+  const { isDragging, files } = useFileDrop(".ifc", canvas);
 
   useEngineResize(instance);
   useBabylonInspector(instance);
