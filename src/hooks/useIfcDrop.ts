@@ -1,9 +1,11 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 
 export function useIfcDrop(
   canvas: RefObject<HTMLCanvasElement | null>,
   loadModel: (source: File) => Promise<void>,
-) {
+): boolean {
+  const [isDragging, setIsDragging] = useState(false);
+
   useEffect(() => {
     const el = canvas.current;
     if (!el) return;
@@ -11,22 +13,19 @@ export function useIfcDrop(
     const onDragOver = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      el.style.opacity = "0.5";
-      el.style.outline = "2px dashed #00aaff";
+      setIsDragging(true);
     };
 
     const onDragLeave = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      el.style.opacity = "";
-      el.style.outline = "";
+      setIsDragging(false);
     };
 
     const onDrop = async (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      el.style.opacity = "";
-      el.style.outline = "";
+      setIsDragging(false);
 
       const file = e.dataTransfer?.files[0];
       if (!file) return;
@@ -53,4 +52,6 @@ export function useIfcDrop(
       el.removeEventListener("drop", onDrop);
     };
   }, [canvas, loadModel]);
+
+  return isDragging;
 }

@@ -10,6 +10,11 @@
   height: 100%;
 }
 
+.canvasDragging {
+  opacity: 0.5;
+  outline: 2px dashed #00aaff;
+}
+
 .overlay {
   position: absolute;
   top: 1rem;

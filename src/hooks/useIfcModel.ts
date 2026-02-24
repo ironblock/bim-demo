@@ -17,7 +17,10 @@ import { useRef, useState, useCallback, type RefObject } from "react";
 import { type BabylonInstance } from "./useBabylonInstance";
 import WebIFC from "@/utility/WebIFC";
 
-function adjustCameraToMeshes(meshes: AbstractMesh[], camera: ArcRotateCamera) {
+export function adjustCameraToMeshes(
+  meshes: AbstractMesh[],
+  camera: ArcRotateCamera,
+) {
   if (meshes.length === 0) return;
 
   const bounds = getModelBounds(meshes);
