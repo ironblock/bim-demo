@@ -21,6 +21,7 @@ import {
   centerModelAtOrigin,
 } from "babylon-ifc-loader";
 import { useRef, useLayoutEffect, type RefObject } from "react";
+import styles from "./Viewer.module.css";
 
 export type RenderContext = {
   engine: Engine;
@@ -86,8 +87,6 @@ export default function Viewer() {
   });
 
   return (
-    <section>
-      <canvas ref={canvas} />
-    </section>
+    <canvas ref={canvas} className={styles.canvas} />
   );
 }
