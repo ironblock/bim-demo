@@ -25,6 +25,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "web-ifc/wasm": ["./node_modules/web-ifc/web-ifc.wasm"],
+      "web-ifc/wasm-mt": ["./node_modules/web-ifc/web-ifc-mt.wasm"],
     },
 
     // Some stricter flags (disabled by default)

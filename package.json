@@ -14,7 +14,8 @@
     "clsx": "^2.1.1",
     "open-props": "^1.7.23",
     "react": "^19",
-    "react-dom": "^19"
+    "react-dom": "^19",
+    "wasm-feature-detect": "^1.8.0"
   },
   "devDependencies": {
     "@babylonjs/inspector": "^8.52.0",

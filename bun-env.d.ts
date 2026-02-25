@@ -22,3 +22,10 @@ declare module "web-ifc/wasm" {
    */
   export = `${string}.wasm`;
 }
+
+declare module "web-ifc/wasm-mt" {
+  /**
+   * The WebAssembly module for WebIFC (Multi-Threaded)
+   */
+  export = `${string}.wasm`;
+}
