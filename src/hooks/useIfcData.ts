@@ -79,7 +79,6 @@ class IfcModelStore {
     const gen = buildScene(groups, modelID, scene, {
       doubleSided: true,
       autoCenter: true,
-      freezeAfterBuild: true,
       verbose: true,
     });
 

@@ -1,6 +1,7 @@
 import {
   AbstractMesh,
   Color3,
+  Constants,
   Material,
   Matrix,
   Mesh,
@@ -21,7 +22,6 @@ const ROOT_NODE_NAME = "ifc-root";
 export interface SceneBuildOptions {
   doubleSided?: boolean; // default: true
   autoCenter?: boolean; // default: true
-  freezeAfterBuild?: boolean; // default: true
   verbose?: boolean; // default: true
   chunkSize?: number; // groups per event-loop yield, default: 1024
 }
@@ -85,6 +85,7 @@ function getOrCreateMaterial(
 
   material.zOffset = zOffset;
   material.backFaceCulling = !doubleSided;
+  material.freeze();
 
   cache.set(group.colorId, material);
 
@@ -114,20 +115,25 @@ async function optimizeGeometry<T extends Mesh>(
   }
 
   if (simplifiedIndices / 3 > maxTriangles) {
-    console.info(`Adding additional LODs to ${mesh.name}`);
+    mesh.setEnabled(false);
     mesh.simplify(
       [
         { distance: 15, quality: 0.9 },
         { distance: 50, quality: 0.5 },
       ],
-      false,
+      true,
       SimplificationType.QUADRATIC,
+      () => {
+        console.info(`Added additional LODs to ${mesh.name}`);
+        mesh.setEnabled(true);
+        mesh.up;
+      },
     );
   }
 
-  // mesh.useLODScreenCoverage = true;
+  mesh.useLODScreenCoverage = true;
   // When the mesh takes up less than 1% of the screen, don't render it.
-  // mesh.addLODLevel(0.01, null);
+  mesh.addLODLevel(0.01, null);
 
   return mesh;
 }
@@ -148,6 +154,11 @@ function geometryGroupToMesh(
   mesh.material = material;
   mesh.isPickable = false;
   mesh.thinInstanceEnablePicking = false;
+  // Bounding info sync skipped — picking is disabled, world matrix is frozen
+  mesh.doNotSyncBoundingInfo = true;
+  // Sphere-only culling is faster and sufficient for static architectural meshes
+  mesh.cullingStrategy = Constants.MESHES_CULLINGSTRATEGY_BOUNDINGSPHERE_ONLY;
+  mesh.alwaysSelectAsActiveMesh = true;
 
   const vertexData = new VertexData();
   vertexData.positions = Array.from(group.positions);
@@ -200,25 +211,13 @@ function createInstances(
 
 /**
  * Finalizes the scene after all groups are built: applies the IFC→Babylon
- * coordinate-system conversion and optionally freezes all IFC materials.
+ * coordinate-system conversion and applies static-scene optimizations.
  */
-function finalizeScene(
-  rootNode: TransformNode,
-  scene: Scene,
-  opts: { freezeAfterBuild: boolean },
-): void {
+function finalizeScene(rootNode: TransformNode, scene: Scene): void {
   // IFC uses a right-handed Z-up coordinate system; Babylon is left-handed Y-up.
   // Flipping Z on the root node handles the handedness conversion.
   rootNode.scaling.z = -1;
   rootNode.computeWorldMatrix(true);
-
-  if (opts.freezeAfterBuild) {
-    // TODO: Currently freezing after creating each mesh for performance reasons
-    // rootNode.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
-    scene.materials.forEach((m) => {
-      if (m.name.startsWith("ifc-material-")) m.freeze();
-    });
-  }
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -241,9 +240,8 @@ export async function* buildScene(
   const opts = {
     doubleSided: true,
     autoCenter: true,
-    freezeAfterBuild: true,
     verbose: true,
-    chunkSize: 1024,
+    chunkSize: 256,
     ...options,
   };
 
@@ -251,7 +249,7 @@ export async function* buildScene(
 
   if (opts.verbose) {
     console.info(
-      `Building scene from ${groups.length} geometry groups (${totalInstances} total instances)`,
+      `Building scene from ${groups.length} geometry groups (${totalInstances} total instances).\nUsing a chunk size of ${opts.chunkSize} (will run in ${Math.ceil(groups.length / opts.chunkSize)} chunks).`,
     );
   }
 
@@ -262,6 +260,9 @@ export async function* buildScene(
   let singletonsTotal = 0;
   let instancesTotal = 0;
 
+  // Prevent material dirty propagation during bulk mesh/material creation
+  scene.blockMaterialDirtyMechanism = true;
+
   // ── Build groups in chunks ────────────────────────────────────────────────
   for (let i = 0; i < groups.length; i += opts.chunkSize) {
     const chunk = groups.slice(i, i + opts.chunkSize);
@@ -269,7 +270,7 @@ export async function* buildScene(
     let instancesInChunk = 0;
 
     if (opts.verbose) {
-      console.group(
+      console.groupCollapsed(
         `Processing chunk ${Math.ceil((i + opts.chunkSize) / opts.chunkSize)} of ${Math.ceil(groups.length / opts.chunkSize)}...`,
       );
     }
@@ -313,14 +314,16 @@ export async function* buildScene(
     };
 
     await new Promise<void>((resolve) =>
-      requestIdleCallback(() => resolve(), { timeout: 64 }),
+      requestIdleCallback(() => resolve(), { timeout: 256 }),
     );
   }
+
+  scene.blockMaterialDirtyMechanism = false;
 
   // ── Finalize ──────────────────────────────────────────────────────────────
   yield { phase: "finalizing", done: 0, total: 1 };
 
-  finalizeScene(rootNode, scene, opts);
+  finalizeScene(rootNode, scene);
 
   const buildTimeMs = performance.now() - startTime;
   const stats: BuildStats = {
@@ -330,6 +333,12 @@ export async function* buildScene(
     totalInstances,
     buildTimeMs,
   };
+
+  // Preserve the visible mesh list across frames — nothing moves after build.
+  // scene.freezeActiveMeshes();
+
+  // Spatial partitioning for O(log n) visible-mesh selection instead of O(n).
+  // scene.createOrUpdateSelectionOctree();
 
   if (opts.verbose) {
     console.info(
@@ -344,7 +353,10 @@ export async function* buildScene(
 
 /**
  * Dispose all IFC meshes, materials, and the root node from the scene.
+ * Unfreezes scene state so the next model load can re-apply optimizations.
  */
 export function disposeScene(scene: Scene): void {
+  // Unfreeze before disposal so Babylon can recompute active mesh list cleanly
+  scene.unfreezeActiveMeshes();
   scene.getTransformNodeByName(ROOT_NODE_NAME)?.dispose();
 }
