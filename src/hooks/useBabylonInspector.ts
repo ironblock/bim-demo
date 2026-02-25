@@ -1,5 +1,5 @@
-import { useEffect, useState, type RefObject } from "react";
-import { type BabylonInstance } from "./useBabylonInstance";
+import { useEffect, useState } from "react";
+import { type BabylonInstanceRef } from "./useBabylonInstance";
 
 const MODIFIER_KEY = navigator?.platform?.includes("Mac")
   ? "metaKey"
@@ -9,9 +9,7 @@ export function keyEventIsInspector(event: KeyboardEvent): boolean {
   return MODIFIER_KEY && event.code === "KeyI";
 }
 
-export function useBabylonInspector(
-  instance: RefObject<BabylonInstance | null>,
-) {
+export function useBabylonInspector(instance: BabylonInstanceRef) {
   const [inspectorLoaded, setInspectorLoaded] = useState(false);
 
   useEffect(() => {
@@ -20,7 +18,7 @@ export function useBabylonInspector(
 
       event.preventDefault();
 
-      const scene = instance.current?.scene;
+      const scene = (await instance.current)?.scene;
       if (!scene) return;
 
       if (!inspectorLoaded) {

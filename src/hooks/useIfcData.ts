@@ -1,16 +1,14 @@
-import { adjustCameraToMeshes } from "@/babylon/camera";
 import { load } from "@/ifc/file";
 import { streamGeometry } from "@/ifc/geometry";
 import { getProjectInfo, type ProjectInfoResult } from "@/ifc/metadata";
 import { buildScene, disposeScene, type BuildProgress } from "@/ifc/scene";
 import WebIFC from "@/utility/WebIFC";
+import { type AbstractMesh, type TransformNode } from "@babylonjs/core";
+import { useRef, useSyncExternalStore } from "react";
 import {
-  type AbstractMesh,
-  type ArcRotateCamera,
-  type TransformNode,
-} from "@babylonjs/core";
-import { useRef, useSyncExternalStore, type RefObject } from "react";
-import { type BabylonInstance } from "./useBabylonInstance";
+  type BabylonInstance,
+  type BabylonInstanceRef,
+} from "./useBabylonInstance";
 
 export interface IfcFileStatus {
   status: "idle" | "loading" | "ready";
@@ -52,9 +50,7 @@ class IfcModelStore {
     this.notify();
   }
 
-  async loadData(source: File, instance: BabylonInstance) {
-    const { scene, camera } = instance;
-
+  async loadData(source: File, { scene, camera }: BabylonInstance) {
     // Dispose previous model if one is loaded
     if (this.state.status === "ready") {
       const { modelID } = this.state;
@@ -67,9 +63,19 @@ class IfcModelStore {
     const modelID = await load(source);
     const api = await WebIFC;
 
+    console.info("Parsing IFC file...");
+
+    const projectInfo = await getProjectInfo(modelID);
+    console.info(`Project Info:\n${JSON.stringify(projectInfo, null, 2)}`);
+
     // Stream and deduplicate geometry (no Babylon calls, runs synchronously)
     const groups = streamGeometry(api, modelID);
+    console.info(`Extracted ${groups.length} geometry groups`);
 
+    console.info(`Closing model ${modelID} and releasing resources`);
+    api.CloseModel(modelID);
+
+    console.info("Preparing to build scene from extracted geometry groups");
     const gen = buildScene(groups, modelID, scene, {
       doubleSided: true,
       autoCenter: true,
@@ -84,17 +90,16 @@ class IfcModelStore {
     }
     const { meshes, rootNode } = next.value;
 
-    const projectInfo = await getProjectInfo(modelID);
-
-    if (meshes.length > 0) {
-      adjustCameraToMeshes(meshes, camera as ArcRotateCamera);
-    }
+    // FIXME: Might need to calculate a bounding box
+    // if (rootNode) {
+    //   adjustCameraToMeshes(rootNode, camera as ArcRotateCamera);
+    // }
 
     this.setState({ status: "ready", meshes, modelID, rootNode, projectInfo });
   }
 }
 
-export function useIfcData(instance: RefObject<BabylonInstance | null>) {
+export function useIfcData(instance: BabylonInstanceRef) {
   const store = useRef(new IfcModelStore());
 
   const ifcState = useSyncExternalStore(
@@ -102,13 +107,11 @@ export function useIfcData(instance: RefObject<BabylonInstance | null>) {
     store.current.getSnapshot,
   );
 
-  const loadIfcFiles = (source: FileList) => {
+  const loadIfcFiles = async (source: FileList) => {
     if (!instance.current || !source[0]) return;
 
     // TODO: Handle multiple files
-    store.current.loadData(source[0], instance.current).catch((error) => {
-      console.error("Failed to load IFC model:", error);
-    });
+    store.current.loadData(source[0], await instance.current);
   };
 
   return { ifcState, loadIfcFiles };

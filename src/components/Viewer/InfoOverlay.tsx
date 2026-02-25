@@ -7,11 +7,7 @@ type Props = {
   modelState: IfcModelState;
 };
 
-export default function InfoOverlay({
-  pickedElement,
-  modelState,
-  ...rest
-}: Props) {
+export default function InfoOverlay({ pickedElement, modelState }: Props) {
   let text: string | null = null;
 
   if (pickedElement) {
@@ -26,9 +22,5 @@ export default function InfoOverlay({
     text = parts.join(" | ") || null;
   }
 
-  return (
-    <div className={styles.overlay} {...rest}>
-      {text}
-    </div>
-  );
+  return <div className={styles.overlay}>{text}</div>;
 }

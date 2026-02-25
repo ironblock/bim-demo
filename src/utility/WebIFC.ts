@@ -27,13 +27,13 @@ export async function chooseWasmPath() {
 }
 
 export async function configure(instance: IfcAPI) {
-  const started = performance.now();
+  const startTime = performance.now();
 
   instance.SetWasmPath(await chooseWasmPath());
   await instance.Init();
 
   console.info(
-    `WebIFC WASM instance started in ${performance.now() - started}ms`,
+    `WebIFC WASM instance started in ${Math.ceil(performance.now() - startTime)}ms`,
   );
 
   return instance;

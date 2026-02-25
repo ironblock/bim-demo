@@ -15,7 +15,7 @@ export function fileSize(bytes: number): string {
 }
 
 export async function load(source: URL | File): Promise<ModelID> {
-  let started = performance.now();
+  let startTime = performance.now();
   let buffer: ArrayBuffer;
   let modelID: ModelID;
 
@@ -42,13 +42,15 @@ export async function load(source: URL | File): Promise<ModelID> {
   }
 
   console.info(
-    `Loaded file (${fileSize(buffer.byteLength)}) in ${performance.now() - started}ms`,
+    `Loaded file (${fileSize(buffer.byteLength)}) in ${Math.ceil(performance.now() - startTime)}ms`,
   );
 
-  started = performance.now();
+  startTime = performance.now();
 
   const id: ModelID = (await WebIFC).OpenModel(new Uint8Array(buffer));
-  console.info(`Opened model (ID: ${id})in ${performance.now() - started}ms`);
+  console.info(
+    `Opened model (ID: ${id})in ${Math.ceil(performance.now() - startTime)}ms`,
+  );
 
   return id;
 }

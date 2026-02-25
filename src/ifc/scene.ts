@@ -14,11 +14,11 @@ import type { GeometryGroup } from "./geometry";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface SceneBuildOptions {
-  doubleSided?: boolean;    // default: true
-  autoCenter?: boolean;     // default: true
+  doubleSided?: boolean; // default: true
+  autoCenter?: boolean; // default: true
   freezeAfterBuild?: boolean; // default: true
-  verbose?: boolean;        // default: true
-  chunkSize?: number;       // groups per event-loop yield, default: 100
+  verbose?: boolean; // default: true
+  chunkSize?: number; // groups per event-loop yield, default: 100
 }
 
 export interface BuildProgress {
@@ -52,12 +52,13 @@ export interface BoundsInfo {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const yieldToEventLoop = () =>
-  new Promise<void>((resolve) => setTimeout(resolve, 0));
-
 function getModelBounds(meshes: AbstractMesh[]): BoundsInfo | null {
-  let minX = Infinity, minY = Infinity, minZ = Infinity;
-  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    minZ = Infinity;
+  let maxX = -Infinity,
+    maxY = -Infinity,
+    maxZ = -Infinity;
   let found = false;
 
   for (const mesh of meshes) {
@@ -65,15 +66,22 @@ function getModelBounds(meshes: AbstractMesh[]): BoundsInfo | null {
     mesh.computeWorldMatrix(true);
     mesh.refreshBoundingInfo(false, false);
     const { minimumWorld, maximumWorld } = mesh.getBoundingInfo().boundingBox;
-    minX = Math.min(minX, minimumWorld.x); maxX = Math.max(maxX, maximumWorld.x);
-    minY = Math.min(minY, minimumWorld.y); maxY = Math.max(maxY, maximumWorld.y);
-    minZ = Math.min(minZ, minimumWorld.z); maxZ = Math.max(maxZ, maximumWorld.z);
+    minX = Math.min(minX, minimumWorld.x);
+    maxX = Math.max(maxX, maximumWorld.x);
+    minY = Math.min(minY, minimumWorld.y);
+    maxY = Math.max(maxY, maximumWorld.y);
+    minZ = Math.min(minZ, minimumWorld.z);
+    maxZ = Math.max(maxZ, maximumWorld.z);
     found = true;
   }
 
   if (!found) return null;
 
-  const center = new Vector3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+  const center = new Vector3(
+    (minX + maxX) / 2,
+    (minY + maxY) / 2,
+    (minZ + maxZ) / 2,
+  );
   const size = new Vector3(maxX - minX, maxY - minY, maxZ - minZ);
   return {
     min: new Vector3(minX, minY, minZ),
@@ -130,7 +138,7 @@ export async function* buildScene(
     autoCenter: true,
     freezeAfterBuild: true,
     verbose: true,
-    chunkSize: 100,
+    chunkSize: 1024,
     ...options,
   };
 
@@ -152,14 +160,29 @@ export async function* buildScene(
   for (let i = 0; i < groups.length; i += opts.chunkSize) {
     const chunk = groups.slice(i, i + opts.chunkSize);
 
+    if (opts.verbose) {
+      console.info(
+        `Processing chunk ${Math.ceil((i + opts.chunkSize) / opts.chunkSize)} of ${Math.ceil(groups.length / opts.chunkSize)}...`,
+      );
+    }
+
     for (const group of chunk) {
-      const material = getMaterial(group, scene, materialCache, zOffset, opts.doubleSided);
+      const material = getMaterial(
+        group,
+        scene,
+        materialCache,
+        zOffset,
+        opts.doubleSided,
+      );
       zOffset = (zOffset + 0.05) % 1.0;
 
       // Upload vertex data
       const mesh = new Mesh(`ifc-geo-${group.geometryExpressID}`, scene);
+      // TODO: Could parent this spatially to the story/floor, etc.
       mesh.parent = rootNode;
       mesh.material = material;
+      //TODO: Disabled for performance reasons
+      mesh.isPickable = false;
       mesh.isVisible = true;
 
       const vertexData = new VertexData();
@@ -176,12 +199,14 @@ export async function* buildScene(
         const mat = Matrix.FromArray(singleton.matrix);
         mesh.metadata = { expressID: singleton.expressID, modelID };
         mesh.setPreTransformMatrix(mat);
+        mesh.freezeWorldMatrix();
         singletonGroups++;
       } else {
         // Multiple instances — use thin instances
         const matrixBuffer = new Float32Array(group.instances.length * 16);
         const expressIDs: number[] = new Array(group.instances.length);
 
+        // TODO: Bet this could be done faster with a compute shader
         for (let j = 0; j < group.instances.length; j++) {
           const inst = group.instances[j]!;
           matrixBuffer.set(inst.matrix, j * 16);
@@ -189,8 +214,10 @@ export async function* buildScene(
         }
 
         mesh.thinInstanceSetBuffer("matrix", matrixBuffer, 16, true);
-        mesh.thinInstanceEnablePicking = true;
+        //TODO: Disabled for performance reasons
+        mesh.thinInstanceEnablePicking = false;
         mesh.metadata = { expressIDs, modelID };
+        mesh.freezeWorldMatrix();
         instancedGroups++;
       }
 
@@ -202,7 +229,10 @@ export async function* buildScene(
       done: Math.min(i + opts.chunkSize, groups.length),
       total: groups.length,
     };
-    await yieldToEventLoop();
+
+    await new Promise<void>((resolve) =>
+      requestIdleCallback(() => resolve(), { timeout: 64 }),
+    );
   }
 
   // ── Finalize ──────────────────────────────────────────────────────────────
@@ -213,20 +243,21 @@ export async function* buildScene(
   rootNode.scaling.z = -1;
   rootNode.computeWorldMatrix(true);
 
-  if (opts.autoCenter) {
-    const bounds = getModelBounds(finalMeshes);
-    if (bounds) {
-      rootNode.position.subtractInPlace(bounds.center);
-      if (opts.verbose) {
-        console.info(
-          `Auto-centered model (offset: ${bounds.center.x.toFixed(2)}, ${bounds.center.y.toFixed(2)}, ${bounds.center.z.toFixed(2)})`,
-        );
-      }
-    }
-  }
+  // if (opts.autoCenter) {
+  //   const bounds = getModelBounds(finalMeshes);
+  //   if (bounds) {
+  //     rootNode.position.subtractInPlace(bounds.center);
+  //     if (opts.verbose) {
+  //       console.info(
+  //         `Auto-centered model (offset: ${bounds.center.x.toFixed(2)}, ${bounds.center.y.toFixed(2)}, ${bounds.center.z.toFixed(2)})`,
+  //       );
+  //     }
+  //   }
+  // }
 
   if (opts.freezeAfterBuild) {
-    rootNode.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
+    // TODO: Currently freezing after creating each mesh for performance reasons
+    // rootNode.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
     scene.materials.forEach((m) => {
       if (m.name.startsWith("ifc-material-")) m.freeze();
     });
@@ -243,9 +274,9 @@ export async function* buildScene(
 
   if (opts.verbose) {
     console.info(
-      `Scene built in ${buildTimeMs.toFixed(0)}ms — ` +
-      `${groups.length} groups, ${instancedGroups} instanced, ${singletonGroups} singletons, ` +
-      `${totalInstances} total placements`,
+      `Scene built in ${Math.ceil(buildTimeMs)}ms — ` +
+        `${groups.length} groups, ${instancedGroups} instanced, ${singletonGroups} singletons, ` +
+        `${totalInstances} total placements`,
     );
   }
 

@@ -1,10 +1,10 @@
-import { useEffect, type RefObject } from "react";
-import { type BabylonInstance } from "./useBabylonInstance";
+import { useEffect } from "react";
+import { type BabylonInstanceRef } from "./useBabylonInstance";
 
-export function useEngineResize(instance: RefObject<BabylonInstance | null>) {
+export function useEngineResize(instance: BabylonInstanceRef) {
   useEffect(() => {
-    const handler = () => {
-      instance.current?.engine.resize();
+    const handler = async () => {
+      (await instance.current)?.engine.resize();
     };
 
     window.addEventListener("resize", handler);

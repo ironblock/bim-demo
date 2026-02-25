@@ -1,42 +1,50 @@
 import { createDefaultCamera } from "@/babylon/camera";
+import { createEngine } from "@/babylon/engine";
 import { createDefaultLight } from "@/babylon/lighting";
-import { Camera, Engine, Light, Scene } from "@babylonjs/core";
+import { Camera, Engine, Light, Scene, WebGPUEngine } from "@babylonjs/core";
 import { useLayoutEffect, useRef, type RefObject } from "react";
 
 export type BabylonInstance = {
-  engine: Engine;
+  engine: WebGPUEngine | Engine;
   scene: Scene;
   camera: Camera;
   light: Light;
 };
 
+export type BabylonInstanceRef = RefObject<Promise<BabylonInstance> | null>;
+
 export function useBabylonInstance(
   canvas: RefObject<HTMLCanvasElement | null>,
-): RefObject<BabylonInstance | null> {
-  const render = useRef<BabylonInstance>(null);
+): BabylonInstanceRef {
+  const ref: BabylonInstanceRef = useRef(null);
 
   useLayoutEffect(() => {
-    if (!canvas.current || render.current) return;
+    if (!window || !canvas.current || ref.current) return;
 
     console.info("Initializing Babylon scene");
-    const engine = new Engine(canvas.current, true);
-    const scene = new Scene(engine);
 
-    const camera = createDefaultCamera(scene);
-    const light = createDefaultLight(scene);
+    ref.current = createEngine(canvas.current).then((engine) => {
+      const scene = new Scene(engine);
+      const instance: BabylonInstance = {
+        engine,
+        scene,
+        camera: createDefaultCamera(scene),
+        light: createDefaultLight(scene),
+      };
 
-    engine.runRenderLoop(() => {
-      scene.render();
+      engine.runRenderLoop(() => {
+        scene.render();
+      });
+
+      return instance;
     });
-
-    render.current = { engine, scene, camera, light };
 
     return () => {
       console.info("Cleaning up Babylon scene");
-      render.current = null;
-      engine.dispose();
+      ref.current?.then(({ engine }) => engine.dispose());
+      ref.current = null;
     };
   }, []);
 
-  return render;
+  return ref;
 }

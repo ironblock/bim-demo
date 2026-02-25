@@ -1,7 +1,7 @@
 import WebIFC from "@/utility/WebIFC";
 import { Color3, type AbstractMesh } from "@babylonjs/core";
-import { useEffect, useRef, useState, type RefObject } from "react";
-import { type BabylonInstance } from "./useBabylonInstance";
+import { useEffect, useRef, useState } from "react";
+import { type BabylonInstanceRef } from "./useBabylonInstance";
 
 export type PickedElementInfo = {
   typeName: string;
@@ -9,14 +9,12 @@ export type PickedElementInfo = {
   expressID: number;
 } | null;
 
-export function useIfcPicking(
-  instance: RefObject<BabylonInstance | null>,
-): PickedElementInfo {
+export function useIfcPicking(instance: BabylonInstanceRef): PickedElementInfo {
   const [pickedElement, setPickedElement] = useState<PickedElementInfo>(null);
   const highlightedMesh = useRef<AbstractMesh | null>(null);
 
   useEffect(() => {
-    const scene = instance.current?.scene;
+    const scene = instance.current;
     if (!scene) return;
 
     scene.onPointerDown = async (evt, pickResult) => {
