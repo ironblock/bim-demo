@@ -10,8 +10,6 @@ export type BabylonInstance = {
   light: Light;
 };
 
-let initialized = false;
-
 export function useBabylonInstance(
   canvas: RefObject<HTMLCanvasElement | null>,
 ): RefObject<BabylonInstance | null> {

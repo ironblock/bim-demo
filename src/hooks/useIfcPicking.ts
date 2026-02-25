@@ -31,16 +31,15 @@ export function useIfcPicking(
       const mesh = pickResult.hit ? pickResult.pickedMesh : null;
       const metadata = mesh?.metadata;
 
-      if (
-        metadata?.expressID !== undefined &&
-        metadata?.modelID !== undefined
-      ) {
+      // Resolve expressID — thin-instanced meshes store an array keyed by thinInstanceIndex
+      const expressID: number | undefined = metadata?.expressIDs
+        ? metadata.expressIDs[pickResult.thinInstanceIndex ?? 0]
+        : metadata?.expressID;
+      const modelID: number | undefined = metadata?.modelID;
+
+      if (expressID !== undefined && modelID !== undefined) {
         try {
-          const element = (await WebIFC).GetLine(
-            metadata.modelID,
-            metadata.expressID,
-            true,
-          );
+          const element = (await WebIFC).GetLine(modelID, expressID, true);
           const typeName = (await WebIFC).GetNameFromTypeCode(element.type);
           const elementName = element.Name?.value ?? "Unnamed";
 
@@ -49,11 +48,7 @@ export function useIfcPicking(
           mesh!.overlayAlpha = 0.3;
           highlightedMesh.current = mesh!;
 
-          setPickedElement({
-            typeName,
-            elementName,
-            expressID: metadata.expressID,
-          });
+          setPickedElement({ typeName, elementName, expressID });
         } catch (error) {
           console.error("Failed to get element data:", error);
           setPickedElement(null);

@@ -1,15 +1,44 @@
-import { initializeWebIFC } from "babylon-ifc-loader";
-import type { IfcAPI } from "web-ifc";
+import { threads } from "wasm-feature-detect";
+import { IfcAPI } from "web-ifc";
 
 /**
  * The web-ifc.wasm file isn't exported by the web-ifc package, so several intermediate
  * steps are required to load it.
  *
- * - The "web-ifc/wasm" alias is included as part of the tsconfig.json "paths" object.
- * - Bun's file loader will resolve the path and place the file appropriately
+ * - The "web-ifc/*" aliases are included in tsconfig.json's "paths"
+ * - Bun's file loader will include the file in the bundle somewhere
  * - `await import()` is used to retrieve the actual path from Bun's manifest
  */
-export const wasmPath: string = (await import("web-ifc/wasm")).default;
-export const WebIFC: Promise<IfcAPI> = initializeWebIFC(wasmPath);
+export const wasmPath = {
+  ST: (await import("web-ifc/wasm")).default,
+  MT: (await import("web-ifc/wasm-mt")).default,
+};
+
+export async function chooseWasmPath() {
+  if (await threads()) {
+    console.info("Browser supports threads. Using multi-threaded WebIFC");
+    return wasmPath.MT;
+  }
+
+  console.info(
+    "Browser does not support threads. Using single-threaded WebIFC",
+  );
+  return wasmPath.ST;
+}
+
+export async function configure(instance: IfcAPI) {
+  const started = performance.now();
+
+  instance.SetWasmPath(await chooseWasmPath());
+  await instance.Init();
+
+  console.info(
+    `WebIFC WASM instance started in ${performance.now() - started}ms`,
+  );
+
+  return instance;
+}
+
+export const WebIFC: Promise<IfcAPI> = configure(new IfcAPI());
 
 export default WebIFC;
