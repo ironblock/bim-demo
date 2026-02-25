@@ -29,10 +29,9 @@ export function useIfcPicking(instance: BabylonInstanceRef): PickedElementInfo {
       const mesh = pickResult.hit ? pickResult.pickedMesh : null;
       const metadata = mesh?.metadata;
 
-      // Resolve expressID — thin-instanced meshes store an array keyed by thinInstanceIndex
-      const expressID: number | undefined = metadata?.expressIDs
-        ? metadata.expressIDs[pickResult.thinInstanceIndex ?? 0]
-        : metadata?.expressID;
+      // All meshes use thin instances; expressID is looked up by thinInstanceIndex
+      const expressID: number | undefined =
+        metadata?.expressIDs?.[pickResult.thinInstanceIndex ?? 0];
       const modelID: number | undefined = metadata?.modelID;
 
       if (expressID !== undefined && modelID !== undefined) {
