@@ -6,7 +6,6 @@
       "name": "bun-react-template",
       "dependencies": {
         "@babylonjs/core": "^8.52.0",
-        "babylon-ifc-loader": "^1.0.2",
         "clsx": "^2.1.1",
         "open-props": "^1.7.23",
         "react": "^19",
@@ -212,8 +211,6 @@
     "@types/react": ["@types/react@19.2.14", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w=="],
 
     "@types/react-dom": ["@types/react-dom@19.2.3", "", { "peerDependencies": { "@types/react": "^19.2.0" } }, "sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ=="],
-
-    "babylon-ifc-loader": ["babylon-ifc-loader@1.0.2", "", { "dependencies": { "@babylonjs/core": "^8.52.0", "web-ifc": "^0.0.75" } }, "sha512-bZkxDrxEI55TTudYUqqKEa86X0HFYXWMc4b0tA7t++QitXySEr+hcoqR6AqJZvyAFpciaiThvUSPDRJJwogzmQ=="],
 
     "babylonjs-gltf2interface": ["babylonjs-gltf2interface@8.52.0", "", {}, "sha512-83k3Qua+yW64+7sAVvCWLOi/zWj4ts9/cG5C9Bv8rMEGq0cgIwVuLZCSvM0eV4MXj7iCEOAVtWRERVMRjg0vfA=="],
 
