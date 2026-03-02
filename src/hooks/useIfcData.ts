@@ -3,7 +3,7 @@ import { streamGeometry } from "@/ifc/geometry";
 import { getProjectInfo, type ProjectInfoResult } from "@/ifc/metadata";
 import { buildScene, disposeScene, type BuildProgress } from "@/ifc/scene";
 import WebIFC from "@/utility/WebIFC";
-import { type AbstractMesh, type TransformNode } from "@babylonjs/core";
+import { type TransformNode } from "@babylonjs/core";
 import { useRef, useSyncExternalStore } from "react";
 import {
   type BabylonInstance,
@@ -22,7 +22,7 @@ interface LoadingState extends IfcFileStatus {
 }
 interface ReadyState extends IfcFileStatus {
   status: "ready";
-  meshes: AbstractMesh[];
+  // meshes: AbstractMesh[];
   modelID: number;
   rootNode: TransformNode;
   projectInfo: ProjectInfoResult;
@@ -87,14 +87,23 @@ class IfcModelStore {
       this.setState({ status: "loading", progress: next.value });
       next = await gen.next();
     }
-    const { meshes, rootNode } = next.value;
+    const {
+      // meshes,
+      rootNode,
+    } = next.value;
 
     // FIXME: Might need to calculate a bounding box
     // if (rootNode) {
     //   adjustCameraToMeshes(rootNode, camera as ArcRotateCamera);
     // }
 
-    this.setState({ status: "ready", meshes, modelID, rootNode, projectInfo });
+    this.setState({
+      status: "ready",
+      // meshes,
+      modelID,
+      rootNode,
+      projectInfo,
+    });
   }
 }
 

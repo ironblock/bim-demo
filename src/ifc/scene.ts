@@ -1,5 +1,4 @@
 import {
-  AbstractMesh,
   Color3,
   Constants,
   Material,
@@ -33,8 +32,7 @@ export interface BuildProgress {
 }
 
 export interface SceneBuildResult {
-  /** All base meshes (one per unique geometry+color group) */
-  meshes: AbstractMesh[];
+  // meshes: AbstractMesh[];
   rootNode: TransformNode;
   stats: BuildStats;
 }
@@ -99,41 +97,20 @@ function getOrCreateMaterial(
  * @see https://doc.babylonjs.com/features/featuresDeepDive/mesh/simplifyingMeshes/
  * @see https://doc.babylonjs.com/features/featuresDeepDive/mesh/LOD
  */
-async function optimizeGeometry<T extends Mesh>(
-  mesh: T,
-  maxTriangles: number = 500,
-): Promise<T> {
-  const initialIndices = mesh.getTotalIndices();
-  let simplifiedIndices = initialIndices;
+async function optimizeGeometry<T extends Mesh>(mesh: T): Promise<T> {
+  mesh.simplify(
+    [
+      // { distance: 5, quality: 0.8 },
+      { distance: 10, quality: 0.25 },
+    ],
+    true,
+    SimplificationType.QUADRATIC,
+    () => {
+      mesh.addLODLevel(15000, null);
 
-  await mesh.optimizeIndicesAsync();
-  simplifiedIndices = mesh.getTotalIndices();
-  if (initialIndices > simplifiedIndices) {
-    console.info(
-      `Optimized mesh ${mesh.name} with from indices ${initialIndices} to ${simplifiedIndices}`,
-    );
-  }
-
-  if (simplifiedIndices / 3 > maxTriangles) {
-    mesh.setEnabled(false);
-    mesh.simplify(
-      [
-        { distance: 15, quality: 0.9 },
-        { distance: 50, quality: 0.5 },
-      ],
-      true,
-      SimplificationType.QUADRATIC,
-      () => {
-        console.info(`Added additional LODs to ${mesh.name}`);
-        mesh.setEnabled(true);
-        mesh.up;
-      },
-    );
-  }
-
-  mesh.useLODScreenCoverage = true;
-  // When the mesh takes up less than 1% of the screen, don't render it.
-  mesh.addLODLevel(0.01, null);
+      console.info(`Added additional LODs to ${mesh.name}`);
+    },
+  );
 
   return mesh;
 }
@@ -142,15 +119,13 @@ async function optimizeGeometry<T extends Mesh>(
  * Creates a Mesh for a geometry group: uploads vertex data, assigns material,
  * and parents it under rootNode. Does not apply instance transforms.
  */
-function geometryGroupToMesh(
+async function geometryGroupToMesh(
   group: GeometryGroup,
   scene: Scene,
   rootNode: TransformNode,
   material: Material,
-): Mesh {
-  const mesh = new Mesh(`ifc-geo-${group.geometryExpressID}`, scene);
-  // TODO: Could parent this spatially to the story/floor, etc.
-  mesh.parent = rootNode;
+): Promise<Mesh> {
+  const mesh = new Mesh(`ifc-geo-${group.geometryExpressID}`, null);
   mesh.material = material;
   mesh.isPickable = false;
   mesh.thinInstanceEnablePicking = false;
@@ -161,12 +136,18 @@ function geometryGroupToMesh(
   mesh.alwaysSelectAsActiveMesh = true;
 
   const vertexData = new VertexData();
-  vertexData.positions = Array.from(group.positions);
-  vertexData.normals = Array.from(group.normals);
-  vertexData.indices = Array.from(group.indices);
+  vertexData.positions = group.positions;
+  vertexData.normals = group.normals;
+  vertexData.indices = group.indices;
   vertexData.applyToMesh(mesh);
+  mesh.optimizeIndices();
 
-  optimizeGeometry(mesh);
+  if (vertexData.indices.length / 3 > 500) {
+    await optimizeGeometry(mesh);
+  }
+  // TODO: Could parent this spatially to the story/floor, etc.
+  scene.addMesh(mesh);
+  mesh.parent = rootNode;
 
   return mesh;
 }
@@ -255,7 +236,6 @@ export async function* buildScene(
 
   const rootNode = new TransformNode(ROOT_NODE_NAME, scene);
   const materials: MaterialCache = new Map();
-  const finalMeshes: AbstractMesh[] = [];
   let zOffset = 0;
   let singletonsTotal = 0;
   let instancesTotal = 0;
@@ -285,7 +265,7 @@ export async function* buildScene(
       );
       zOffset = (zOffset + 0.05) % 1.0;
 
-      const mesh = geometryGroupToMesh(group, scene, rootNode, material);
+      const mesh = await geometryGroupToMesh(group, scene, rootNode, material);
       const instances = createInstances(mesh, group, modelID);
 
       if (instances === 1) {
@@ -293,8 +273,6 @@ export async function* buildScene(
       } else {
         instancesInChunk++;
       }
-
-      finalMeshes.push(mesh);
     }
 
     singletonsTotal += singletonsInChunk;
@@ -348,7 +326,7 @@ export async function* buildScene(
     );
   }
 
-  return { meshes: finalMeshes, rootNode, stats };
+  return { rootNode, stats };
 }
 
 /**

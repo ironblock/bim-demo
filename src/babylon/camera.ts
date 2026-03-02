@@ -10,14 +10,15 @@ export function createDefaultCamera(scene: Scene): ArcRotateCamera {
     "camera",
     -Math.PI / 2,
     Math.PI / 2.5,
-    10,
+    200,
     Vector3.Zero(),
     scene,
   );
   camera.attachControl(null, true);
   camera.lowerRadiusLimit = 1;
-  camera.upperRadiusLimit = 1000;
+  camera.upperRadiusLimit = 500;
   camera.wheelPrecision = 10;
+  camera.maxZ = 50000;
 
   return camera;
 }

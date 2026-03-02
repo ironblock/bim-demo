@@ -33,8 +33,8 @@ export function useBabylonInstance(
     ref.current = createEngine(canvas.current).then((engine) => {
       const scene = new Scene(engine, {
         // Speed up geometry/material lookups at the cost of some memory
-        // useGeometryUniqueIdsMap: true,
-        // useMaterialMeshMap: true,
+        useGeometryUniqueIdsMap: true,
+        useMaterialMeshMap: true,
       });
 
       // Skip picking on pointer move — we only pick on click (useIfcPicking)
