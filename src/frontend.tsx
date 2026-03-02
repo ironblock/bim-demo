@@ -9,6 +9,8 @@ import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "./pages/App";
 
+import "./index.css";
+
 const getRoot = (): Root => {
   const elem = document.getElementById("root")!;
 

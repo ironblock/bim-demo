@@ -9,28 +9,29 @@ import { IfcAPI } from "web-ifc";
  * - Bun's file loader will include the file in the bundle somewhere
  * - `await import()` is used to retrieve the actual path from Bun's manifest
  */
-export const wasmPath = {
-  ST: (await import("web-ifc/wasm")).default,
-  MT: (await import("web-ifc/wasm-mt")).default,
-};
-
 export async function chooseWasmPath() {
+  let path;
+
   if (await threads()) {
     console.info("Browser supports threads. Using multi-threaded WebIFC");
-    return wasmPath.MT;
+    path = require("web-ifc-mt-wasm");
+  } else {
+    console.info(
+      "Browser does not support threads. Using single-threaded WebIFC",
+    );
+    path = require("web-ifc-wasm");
   }
 
-  console.info(
-    "Browser does not support threads. Using single-threaded WebIFC",
-  );
-  return wasmPath.ST;
+  console.info(`Loading WASM from ${path}`);
+  return path;
 }
 
 export async function configure(instance: IfcAPI) {
   const startTime = performance.now();
 
-  instance.SetWasmPath(await chooseWasmPath());
-  await instance.Init();
+  // instance.SetWasmPath(await chooseWasmPath(), true);
+  const path = await chooseWasmPath();
+  await instance.Init(() => path);
 
   console.info(
     `WebIFC WASM instance started in ${Math.ceil(performance.now() - startTime)}ms`,
